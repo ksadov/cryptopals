@@ -1,13 +1,5 @@
 #define SIZE 1024
-
-/**
- * An array of binary data of length len.
- */
-typedef struct binarray
-{
-  unsigned char* bin;
-  int len;
-} binarray_t;
+#define BIGSIZE 8192
 
 /**
  * Returns the value represented by hexadecimal character hex,
@@ -62,16 +54,20 @@ void fill_buf(unsigned char* buf, const int n, const unsigned char c);
 int hamming_distance(const unsigned char* c1, const unsigned char* c2, int len);
 
 /**
- * Returns the estimated size of the Vignere cypher key used to encrypt the
- * first len bytes of msg.
+ * Returns the estimated size of the Vignere cypher key (between min and max
+ * characters in length) used to encrypt the first len bytes of msg.
  */
-int find_keysize (const unsigned char* c1, int len);
+int find_keysize (const unsigned char* c1, int len, int min, int max);
 
 /**
  * Stores the Vignere cyphere decoding of the first len characters of
- * the binary data in msg as a null-terminated string in buf.
+ * the binary data in msg as a null-terminated string in buf, and the key
+ * as a null-terminagted string in keybuf.
+ * Requires: the size of the key used in Vignere encoding is between min and max
+ * characters in length.
  */
-int break_vignere(char * buf, const unsigned char* msg, int len);
+int break_vignere(char * buf, char* keybuf,  const unsigned char* msg,
+                  int len, int min, int max);
 
 /**
  * Returns the value represented by the base 64 character c, or -1
@@ -80,15 +76,9 @@ int break_vignere(char * buf, const unsigned char* msg, int len);
 int b64_char_val (char c);
 
 /**
- * Returns a positive number if a1 has a lower caesar score,
- * negative if a2 has a lower caesar score, and 0 if their scores are even.
- */
-int caesar_compare (const void * a1, const void * a2);
-
-/**
  *  xors the first n characters of a1 and a2 and stores results in buf
  */
-void bin_xor (binarray_t buf, const unsigned char* a1, const unsigned char* a2,
+void bin_xor (unsigned char* buf, const unsigned char* a1, const unsigned char* a2,
               const int n);
 
 /**
@@ -99,9 +89,9 @@ void fill_buf(unsigned char* buf, const int n, const unsigned char c);
 /**
  * xors the first len characters in msg against all 256 ascii characters,
  * then stores whatever resulting array has the highest caesar score in buf
- * Returns: 0 upon successful completion
+ * Returns: the character that produces the highest caesar score
  */
-int singlechar_xor (char* buf, const unsigned char* msg, const int len);
+char singlechar_xor (char* buf, const unsigned char* msg, const int len);
 
 /**
  * xors the first len characters of msg with (len / keylen)
@@ -123,7 +113,7 @@ void bin_to_hex (char* buf, const unsigned char* bin, int len);
 int hamming_distance(const unsigned char* c1, const unsigned char* c2, int len);
 
 /**
- * Returns the caesar score of msg, where a higher score means more resemblance
- * to an english string.
+ * Returns the caesar score of the first len characters of msg, where a
+ * higher score means more resemblance to an english string.
  */
-int caesar_score (const binarray_t msg);
+int caesar_score (const unsigned char * msg, int len );

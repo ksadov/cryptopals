@@ -3,7 +3,7 @@
 #include <string.h>
 #include "cputils.h"
 #include <float.h>
-#define MAX_SIZE 1024
+#include <limits.h>
 
 static const char base64_table[65] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -117,30 +117,26 @@ void fill_buf_hex (char* buf, const char x, int len) {
 }
 
 
-int caesar_score (const binarray_t msg) {
+int caesar_score (const unsigned char * msg, int len) {
   int score = 0;
-  for (int i = 0; i < msg.len; i++) {
-    if (index(best_letters_l, msg.bin[i])) score += 100;
-    else if (index(good_letters_l, msg.bin[i])) score += 20;
-    else if (index(ok_letters_l, msg.bin[i])) score += 11;
-    else if (msg.bin[i] == 0) score -= 100000;
-    else if ((msg.bin[i] < 'A' ||
-        (msg.bin[i] > 'Z' && msg.bin[i] < 'a') ||
-        msg.bin[i] > 'z') && index(ok_nonletters, msg.bin[i]) == NULL) {
+  for (int i = 0; i < len; i++) {
+    if (index(best_letters_l, msg[i])) score += 100;
+    else if (index(good_letters_l, msg[i])) score += 20;
+    else if (index(ok_letters_l, msg[i])) score += 11;
+    else if (msg[i] == 0) score -= 100000;
+    else if ((msg[i] < 'A' ||
+        (msg[i] > 'Z' && msg[i] < 'a') ||
+        msg[i] > 'z') && index(ok_nonletters, msg[i]) == NULL) {
       score -= 1000;
       }
   }
   return score;
 }
 
-int caesar_compare (const void * a1, const void * a2) {
-  return caesar_score( *(binarray_t *)a2) - caesar_score(*(binarray_t *)a1);
-}
-
-void bin_xor (binarray_t buf, const unsigned char* a1, const unsigned char* a2,
+void bin_xor (unsigned char * buf, const unsigned char* a1, const unsigned char* a2,
               const int n) {
   for (int i = 0; i < n; i++) {
-    buf.bin[i] = a1[i] ^ a2[i];
+    buf[i] = a1[i] ^ a2[i];
   }
 }
 
@@ -179,6 +175,27 @@ void repeating_key_xor (unsigned char* buf, const char* msg,
   }
 }
 
+char singlechar_xor (char* buf, const unsigned char* msg, const int len) {
+  unsigned char charbuf[BIGSIZE];
+  unsigned char xorbuf[BIGSIZE];
+  char bestchar;
+  int max_score = INT_MIN;
+  int newscore;
+  charbuf[len] = 0;
+  for (unsigned char i = 0; i < 255; i++) {
+    fill_buf(charbuf, len, i);
+    bin_xor(xorbuf, msg, charbuf, len);
+    newscore = caesar_score(xorbuf, len);
+    if (newscore > max_score) {
+      bestchar = i;
+      max_score = newscore;
+    }
+  }
+  fill_buf(charbuf, len, bestchar);
+  bin_xor((unsigned char *)buf, msg, charbuf, len);
+  return bestchar;
+}
+
 void bin_to_hex (char* buf, const unsigned char* bin, int len) {
   buf[0] = '0';
   for (int i = 0; i < len; i++) {
@@ -200,7 +217,8 @@ int hamming_distance(const unsigned char* c1, const unsigned char* c2, int len) 
   return count;
 }
 
-double block_compare (const unsigned  char* msg, const int keysize, const int len) {
+double block_compare (const unsigned  char* msg, const int keysize,
+                      const int len) {
   int pos1 = 0;
   int pos2 = keysize;
   double avg_dist = 0;
@@ -214,21 +232,21 @@ double block_compare (const unsigned  char* msg, const int keysize, const int le
     pos1 = pos2 + keysize;
     pos2 = pos1 + keysize;
   }
-  if (count == 0) return MAX_SIZE;
+  if (count == 0) return SIZE;
   final_dist = avg_dist / (count*keysize);
   return final_dist;
 }
 
-int find_keysize(const unsigned char* msg, int len) {
+int find_keysize(const unsigned char* msg, int len, int min, int max) {
   double dist = 0;
-  double min = DBL_MAX;
+  double mindist = DBL_MAX;
   int keysize = 0;
-  for (int i = 2; i < 41; i++) {
+  for (int i = min; i < max; i++) {
     dist = block_compare (msg, i, len);
     printf("dist: %lf, i: %d\n", dist, i);
-    if (dist < min) {
+    if (dist < mindist) {
       keysize = i;
-      min = dist;
+      mindist = dist;
     }
   }
   return keysize;
@@ -258,23 +276,24 @@ int break_vignere(char * buf, const unsigned char* msg, int len) {
 }
 */
 
-int break_vignere(char * buf, const unsigned char* msg, int len) {
-  int keysize = find_keysize(msg, len);
+int break_vignere(char * buf, char * keybuf, const unsigned char* msg, int len,
+                  int min, int max) {
+  int keysize = find_keysize(msg, len, min, max);
   int xorlen;
   for (int i = 0; i < keysize; i++) {
-    unsigned char tblock[MAX_SIZE];
-    char xblock[MAX_SIZE];
+    unsigned char tblock[SIZE];
+    char xblock[SIZE];
     xorlen = 0;
     for (int j = i; j < len; j+= keysize) {
       tblock[j / keysize] = msg[j];
       xorlen++;
     }
-   singlechar_xor(xblock, tblock, xorlen);
+   keybuf[i] = singlechar_xor(xblock, tblock, xorlen);
    for (int j = i; j < len; j+= keysize) {
      buf[j] = xblock[j / keysize];
    }
    buf[len] = 0;
   }
-  printf("keysize %d, decoded: %s\n", keysize, buf);
+  printf("keysize %d\nkey: %s\ndecoded: %s\n", keysize, keybuf, buf);
   return 0;
 }
