@@ -25,6 +25,10 @@ cp5: cp5.o cputils.o
 	@$(CC) $(CFLAGS) -o cp5.exe cp5.o cputils.o
 	@./cp5.exe
 
+cp6: cp6.o cputils.o
+	@$(CC) $(CFLAGS) -o cp6.exe cp6.o cputils.o
+	@./cp6.exe
+
 clean:
 	rm -f *.exe
 	rm -f *.o
