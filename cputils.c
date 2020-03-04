@@ -5,19 +5,19 @@
 #include <float.h>
 #include <limits.h>
 
-static const char base64_table[65] =
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const char* base64_table =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-/*
-static const char best_letters[10] = "eEtTaAoOiI";
-static const char good_letters[14] = "nNsSrRhHdD";
-static const char ok_letters[16] = "lLuUcCmMfFyYwWgG";
-*/
 
-static const char best_letters_l[7] = "etaoi";
-static const char good_letters_l[7] = "nsrhd";
-static const char ok_letters_l[8] = "lucmfywg";
-static const char ok_nonletters[9]= " !',.:;?\n";
+static const char* best_letters_u = " ETAOIN";
+static const char* good_letters_u = "SRHLDCUM";
+static const char* ok_letters_u = "";
+
+static const char* best_letters_l = " etaoin";
+static const char* good_letters_l = "srhldcum";
+static const char* ok_letters_l = "gyfpwb.,vk";
+
+static const char* ok_nonletters= "-!,.?\n'";
 
 char hexchar_to_int (char hex) {
   if (hex >= '0' && hex <= '9')
@@ -55,6 +55,7 @@ int b64_char_val (char c) {
 int b64_to_binary (unsigned char* buf, const char* b64, int len) {
   unsigned char c1; unsigned char c2; unsigned char c3; unsigned char c4;
   int b64i = 0;
+  int padding = 0;
   for (int i = 0; i < (len - 2); i+= 3) {
     c1 = b64_char_val(b64[b64i]);
     c2 = b64_char_val(b64[b64i + 1]);
@@ -120,10 +121,13 @@ void fill_buf_hex (char* buf, const char x, int len) {
 int caesar_score (const unsigned char * msg, int len) {
   int score = 0;
   for (int i = 0; i < len; i++) {
-    if (index(best_letters_l, msg[i])) score += 100;
-    else if (index(good_letters_l, msg[i])) score += 20;
-    else if (index(ok_letters_l, msg[i])) score += 11;
-    else if (msg[i] == 0) score -= 100000;
+    if (msg[i] == '\0') score -= 1000;
+    else if (index(best_letters_l, msg[i])) { score += 200; }
+    else if (index(good_letters_l, msg[i])) { score += 100; }
+    else if (index(ok_letters_l, msg[i])) { score += 50; }
+    else if (index(best_letters_u, msg[i])) { score += 50; }
+    else if (index(good_letters_u, msg[i])) { score += 10; }
+    else if (index(ok_letters_u, msg[i])) { score += 5; }
     else if ((msg[i] < 'A' ||
         (msg[i] > 'Z' && msg[i] < 'a') ||
         msg[i] > 'z') && index(ok_nonletters, msg[i]) == NULL) {
@@ -133,8 +137,8 @@ int caesar_score (const unsigned char * msg, int len) {
   return score;
 }
 
-void bin_xor (unsigned char * buf, const unsigned char* a1, const unsigned char* a2,
-              const int n) {
+void bin_xor (unsigned char * buf, const unsigned char* a1,
+              const unsigned char* a2, const int n) {
   for (int i = 0; i < n; i++) {
     buf[i] = a1[i] ^ a2[i];
   }
@@ -145,27 +149,6 @@ void fill_buf(unsigned char* buf, const int n, const unsigned char c) {
     buf[i] = c;
   }
 }
-
-/*
-int singlechar_xor (char* buf, const unsigned char* msg, const int len) {
-  unsigned char charbuf[MAX_SIZE];
-  charbuf[len] = 0;
-  binarray_t asciiresults[256];
-  for (int i = 0; i < 256; i++) {
-    asciiresults[i].bin = malloc(len+1);
-    asciiresults[i].len = len;
-    (asciiresults[i]).bin[len] = 0;
-    fill_buf(charbuf, len, (char)i);
-    bin_xor(asciiresults[i], msg, charbuf, len);
-  }
-  mergesort(asciiresults, 256, sizeof(binarray_t), *caesar_compare);
-  memcpy(buf, asciiresults[0].bin, len);
-  for (int j = 0; j < 255; j++) {
-    free(asciiresults[j].bin);
-  }
-  return 0;
-}
-*/
 
 void repeating_key_xor (unsigned char* buf, const char* msg,
                         const char* key,
@@ -243,7 +226,7 @@ int find_keysize(const unsigned char* msg, int len, int min, int max) {
   int keysize = 0;
   for (int i = min; i < max; i++) {
     dist = block_compare (msg, i, len);
-    printf("dist: %lf, i: %d\n", dist, i);
+    //printf("dist: %lf, i: %d\n", dist, i);
     if (dist < mindist) {
       keysize = i;
       mindist = dist;
@@ -251,30 +234,6 @@ int find_keysize(const unsigned char* msg, int len, int min, int max) {
   }
   return keysize;
 }
-
-/*
-int break_vignere(char * buf, const unsigned char* msg, int len) {
-  int keysize = find_keysize(msg, len);
-  int xorlen;
-  for (int i = 0; i < keysize; i++) {
-    unsigned char tblock[MAX_SIZE];
-    char xblock[MAX_SIZE];
-    xorlen = 0;
-    for (int j = i; j < len; j+= keysize) {
-      tblock[j / keysize] = msg[j];
-      xorlen++;
-    }
-   //printf("len: %d, keysize: %d, xorlen: %d\n", len, keysize, xorlen);
-   singlechar_xor(xblock, tblock, xorlen);
-   for (int j = i; j < len; j+= keysize) {
-     buf[j] = xblock[j / keysize];
-   }
-   //null terminate buf
-   buf[len] = 0;
-  }
-  return 0;
-}
-*/
 
 int break_vignere(char * buf, char * keybuf, const unsigned char* msg, int len,
                   int min, int max) {
@@ -284,8 +243,8 @@ int break_vignere(char * buf, char * keybuf, const unsigned char* msg, int len,
     unsigned char tblock[SIZE];
     char xblock[SIZE];
     xorlen = 0;
-    for (int j = i; j < len; j+= keysize) {
-      tblock[j / keysize] = msg[j];
+    for (int j = i; j < len; j += keysize) {
+      tblock[j/keysize] = msg[j];
       xorlen++;
     }
    keybuf[i] = singlechar_xor(xblock, tblock, xorlen);
@@ -294,6 +253,5 @@ int break_vignere(char * buf, char * keybuf, const unsigned char* msg, int len,
    }
    buf[len] = 0;
   }
-  printf("keysize %d\nkey: %s\ndecoded: %s\n", keysize, keybuf, buf);
   return 0;
 }
